@@ -1,0 +1,40 @@
+offset_x = 90
+plr_speed = 311.5
+sample_len_ms = 20
+
+
+extract obj_props
+extract {
+    SFX_ID: @object_key::{id: 392, pattern: @number, name: "SFX_ID"},
+    SPEED: @object_key::{id: 404, pattern: @number, name: "SPEED"},
+    PITCH: @object_key::{id: 405, pattern: @number, name: "PITCH"},
+    VOLUME: @object_key::{id: 406, pattern: @number, name: "SONG_SFX_VOLUME"},
+    START: @object_key::{id: 408, pattern: @number, name: "START"},
+    END: @object_key::{id: 410, pattern: @number, name: "END"},
+    IS_UNIQUE: @object_key::{id: 415, pattern: @bool, name: "IS_UNIQUE"},
+    UNIQUE_ID: @object_key::{id: 416, pattern: @number, name: "UNIQUE_ID"},
+    OVERRIDE: @object_key::{id: 420, pattern: @bool, name: "OVERRIDE"},
+    PRE_LOAD: @object_key::{id: 433, pattern: @bool, name: "PRE_LOAD"},
+}
+
+sfxs = $.readfile("output.json", "json")
+for i in 0..sfxs.length {
+    [sfx_id, sfx_time, pitch, _] = sfxs[i]
+    
+    $.add(obj{
+        OBJ_ID: 3602,
+        X: offset_x + i * plr_speed * (sample_len_ms / 1000),
+        Y: 300 - (i % 5) * 30,
+        SCALING: 0.5,
+        SFX_ID: sfx_id,
+        START: sfx_time,
+        END: sfx_time + sample_len_ms,
+        SPEED: 0,
+        PITCH: pitch,
+        PRE_LOAD: true,
+        IS_UNIQUE: true,
+        UNIQUE_ID: i,
+        VOLUME: 1,
+        GROUPS: 1g
+    })
+}
