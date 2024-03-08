@@ -1,10 +1,10 @@
 
+USE_CACHE = True # the cache file takes about 1.2 gb
 MODIFY_PITCH = False
-SAMPLE_LEN_MS = 20
+SAMPLE_LEN_MS = 12
 SOUND_NAME = "elementary.wav"
-USE_SONGS = True
 
-import json
+import re
 import os
 import librosa
 import numpy as np
@@ -19,6 +19,16 @@ def load_sound_effects(input_folder):
     sample_rate_div_1000 = sample_rate / 1000
     num_samples = int(sample_rate_div_1000 * SAMPLE_LEN_MS)
 
+    try:
+        if USE_CACHE == False: raise # 🤣
+
+        print("found cache file, using cache")
+        array = np.load("cache.npy", allow_pickle=True)
+
+        return array
+    except:
+        print("cache file not found, creating")
+    
     i = 0
     # Iterate through all files in the input folder
     for filename in os.listdir(input_folder):
@@ -43,34 +53,38 @@ def load_sound_effects(input_folder):
 
         # Extract all samples in intervals of n ms
         samples = np.array(audio.get_array_of_samples(), dtype=np.int8)
+
         r = range(-12, 13) if MODIFY_PITCH else [0] # wtf
 
         # this is terrible af i cant release this
         for semitones in r:
             pitch_audio = audio_data[semitones+12]
             pitch_audio[sound_id] = []
-
+            
             # convert each sfx to float to shift the pitch
             # then convert them back to int8
             arr = samples
             if MODIFY_PITCH and semitones != 0:
                 arr = (librosa.effects.pitch_shift(
-                    librosa.util.buf_to_float(samples), # removed .copy() from `samples` in `.buf_to_float(samples)`, hope nothing breaks
+                    librosa.util.buf_to_float(samples, n_bytes=1), # removed .copy() from `samples` in `.buf_to_float(samples)`, hope nothing breaks
                     sr=44100,
                     n_steps=semitones,
                 ) * 127).astype(np.int8)
 
-            for ms in range(0, audio_len-SAMPLE_LEN_MS, SAMPLE_LEN_MS):
-                sample_idx = int(ms * sample_rate_div_1000)
-                pitch_audio[sound_id].append(arr[sample_idx : sample_idx + num_samples])
+            ms_values = np.arange(0, audio_len - SAMPLE_LEN_MS, SAMPLE_LEN_MS)
+            sample_indices = (ms_values * sample_rate_div_1000).astype(int)
+            valid_indices = np.where(sample_indices + num_samples <= len(arr))[0]
+            pitch_audio[sound_id] = np.array(arr[sample_indices[valid_indices, None] + np.arange(num_samples)], dtype=np.int8)
 
-            pitch_audio[sound_id] = np.array(pitch_audio[sound_id], dtype=np.int8)
 
-    to_return = [
+    to_return = np.array([
         (list(i.values()), list(i.keys())) 
         if len(i) > 0 else ([np.array([[-1]], dtype=np.int8)],[-1])
         for i in audio_data
-    ]
+    ])
+
+    print("writing to cache")
+    np.save('cache.npy', to_return)
 
     return to_return
 
@@ -110,27 +124,31 @@ def match_sound(array_of_sounds, path):
     audio = AudioSegment.from_file(path)
 
     sample_rate = int(44100)
-    num_samples = int(sample_rate / 1000 * SAMPLE_LEN_MS)
+    sample_rate_div_1000 = sample_rate / 1000
+    num_samples = int(sample_rate_div_1000 * SAMPLE_LEN_MS)
     # print(weight_pattern)
 
     cumdist = 0
 
     audio = audio.set_frame_rate(sample_rate).set_sample_width(1).set_channels(1)
     audio_len = len(audio)
+
     print(audio.frame_rate)
     print(audio_len)
     
+    
     indexes = [] # [(soundname, timestamp, pitch), ...]
-    samples = tuple(audio.get_array_of_samples())
+    samples = np.array(audio.get_array_of_samples(), dtype=np.int8)
+
     for ms in range(0, audio_len-SAMPLE_LEN_MS, SAMPLE_LEN_MS):
-        sample_idx = int(ms/1000 * sample_rate)
-        original_array = np.array(samples[sample_idx : sample_idx + num_samples], dtype=np.int8)
+        sample_idx = int(ms * sample_rate_div_1000)
+        original_array = samples[sample_idx : sample_idx + num_samples]
 
         results = []
         for semitones in (range(len(array_of_sounds)) if MODIFY_PITCH else [12]):
             arr_pitches = array_of_sounds[semitones][0]
             sfx_ids = array_of_sounds[semitones][1]
-
+            
             arr_l1_idx, timestamp, dist = find_closest(original_array, arr_pitches)
             pitch = (semitones-12)*MODIFY_PITCH
 
@@ -142,12 +160,15 @@ def match_sound(array_of_sounds, path):
 
         indexes.append((sfx_id, timestamp*SAMPLE_LEN_MS, pitch, arr_l1_idx))
     
-    print(f"\navg dist: {cumdist / ((audio_len-SAMPLE_LEN_MS) / SAMPLE_LEN_MS):.3f}\ntime elapsed")
+
+    print(f"\navg dist: {cumdist / ((audio_len-SAMPLE_LEN_MS) / SAMPLE_LEN_MS):.3f}\nsaving sound to file")
+
 
     with open("./output.json", 'w') as f:
-        f.write(str(indexes).replace("(", "[").replace(")", "]").replace(" ", ""))
-    print(indexes[0])
-    print("playing sound")
+        # the regex sub is for removing the last element of each array/tuple
+        f.write(re.sub(r',(\d+)(?=\])', '', str(indexes).replace("(", "[").replace(")", "]").replace(" ", "")))
+
+
     audio_output = AudioSegment(
         data=bytes(np.array([
             array_of_sounds[i[2]+12][0][i[3]][i[1]//SAMPLE_LEN_MS]
@@ -157,13 +178,13 @@ def match_sound(array_of_sounds, path):
         frame_rate=sample_rate,
         channels=1
     )
+
     audio_output.export("out.wav", format="wav")
 
 
 if __name__ == "__main__":
     localappdata = os.getenv('LOCALAPPDATA')
     if localappdata is None:
-        print("LocalAppdata is none!")
         raise Exception("LocalAppData is None!")
     input_folder_path = os.path.join(localappdata, "GeometryDash")
 

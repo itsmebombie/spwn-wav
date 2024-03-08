@@ -1,6 +1,11 @@
 offset_x = 90
-plr_speed = 311.5
-sample_len_ms = 20
+sample_len_ms = 12
+stack_size = 15
+
+
+plr_speed = 311.5 * (sample_len_ms / 1000)
+y_diff = 15
+
 
 
 extract obj_props
@@ -11,30 +16,57 @@ extract {
     VOLUME: @object_key::{id: 406, pattern: @number, name: "SONG_SFX_VOLUME"},
     START: @object_key::{id: 408, pattern: @number, name: "START"},
     END: @object_key::{id: 410, pattern: @number, name: "END"},
+    LOOP: @object_key::{id: 413, pattern: @bool, name: "LOOP"},
+    STOP_LOOP: @object_key::{id: 414, pattern: @bool, name: "STOP_LOOP"},
     IS_UNIQUE: @object_key::{id: 415, pattern: @bool, name: "IS_UNIQUE"},
     UNIQUE_ID: @object_key::{id: 416, pattern: @number, name: "UNIQUE_ID"},
+    STOP: @object_key::{id: 417, pattern: @bool, name: "STOP"},
+    CHANGE_VOLUME: @object_key::{id: 418, pattern: @bool, name: "CHANGE_VOLUME"},
     OVERRIDE: @object_key::{id: 420, pattern: @bool, name: "OVERRIDE"},
     PRE_LOAD: @object_key::{id: 433, pattern: @bool, name: "PRE_LOAD"},
+    SFX_GROUP: @object_key::{id: 455, pattern: @number, name: "SFX_GROUP"},
 }
 
 sfxs = $.readfile("output.json", "json")
 for i in 0..sfxs.length {
-    [sfx_id, sfx_time, pitch, _] = sfxs[i]
+    [sfx_id, sfx_time, pitch] = sfxs[i]
+
+    stack_pos = i % stack_size
+    uniqueid = stack_pos + 1
     
     $.add(obj{
         OBJ_ID: 3602,
-        X: offset_x + i * plr_speed * (sample_len_ms / 1000),
-        Y: 300 - (i % 5) * 30,
+        X: offset_x + (i - stack_size + 2) * plr_speed,
+        Y: 330 + (stack_size - stack_pos) * y_diff,
         SCALING: 0.5,
         SFX_ID: sfx_id,
         START: sfx_time,
-        END: sfx_time + sample_len_ms,
-        SPEED: 0,
-        PITCH: pitch,
-        PRE_LOAD: true,
+        END: sfx_time + 1,
+        SPEED: pitch,
+        PITCH: 0,
         IS_UNIQUE: true,
-        UNIQUE_ID: i,
+        UNIQUE_ID: uniqueid,
+        VOLUME: 0,
+        LOOP: true,
+    })
+
+    $.add(obj{
+        OBJ_ID: 3603,
+        X: offset_x + i * plr_speed,
+        Y: 300 - stack_pos * y_diff,
+        SCALING: 0.5,
+        CHANGE_VOLUME: true,
+        STOP_LOOP: true,
+        UNIQUE_ID: uniqueid,
         VOLUME: 1,
-        GROUPS: 1g
+    })
+
+    $.add(obj{
+        OBJ_ID: 3603,
+        X: offset_x + (i + 1) * plr_speed,
+        Y: 300 - stack_pos * y_diff,
+        SCALING: 0.5,
+        STOP: true,
+        UNIQUE_ID: uniqueid,
     })
 }
