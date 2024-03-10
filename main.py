@@ -91,7 +91,7 @@ def load_sound_effects(input_folder):
 
 @jit(nopython=True)
 def euclidean_distance(arr1: np.ndarray, arr2: np.ndarray) -> np.float64:
-    return np.sum((arr1 - arr2)**2)**0.5 # np.sum returns int
+    return np.sum((arr1 - arr2)**2) # np.sum returns int
 
 
 @jit(nopython=True)
@@ -108,7 +108,7 @@ def find_closest(array: np.ndarray, arr_pitches: np.ndarray) -> tuple:
 
             if distance < min_distance:
                 min_distance = distance
-                closest_array = (arr_l1_idx, arr_l2_idx, distance)
+                closest_array = (arr_l1_idx, arr_l2_idx, distance**0.5)
                 # print(distance, closest_array)
 
     # if closest_array == None: raise Exception("Wtf?????/") # just code good bro :rofl:

@@ -3,7 +3,7 @@ sample_len_ms = 12
 stack_size = 15
 
 
-plr_speed = 311.5 * (sample_len_ms / 1000)
+plr_speed = 311 * sample_len_ms / 1000
 y_diff = 15
 
 
@@ -42,8 +42,8 @@ for i in 0..sfxs.length {
         SFX_ID: sfx_id,
         START: sfx_time,
         END: sfx_time + 1,
-        SPEED: pitch,
-        PITCH: 0,
+        SPEED: 0,
+        PITCH: pitch,
         IS_UNIQUE: true,
         UNIQUE_ID: uniqueid,
         VOLUME: 0,
